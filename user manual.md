@@ -25,9 +25,28 @@ Durante la operación normal, la pantalla muestra el último evento (tag leído,
 
 ## 3. Administrar la lista blanca de tags
 
-> Hoy no existe un portal web ni pantalla de alta de tags: la lista blanca se administra editando el archivo `tags.txt` directamente en la SD. Ver el [Roadmap del README](README.md#roadmap-hacia-un-sistema-de-control-de-acceso-propio-de-aysafi) para el plan de agregar un portal de administración.
+Hay dos formas de administrar la lista blanca: el **portal cautivo** (en tiempo real, recomendado) o editando el archivo `tags.txt` de la SD a mano.
 
-### 3.1 Formato del archivo `tags.txt`
+### 3.1 Portal cautivo (alta/baja en tiempo real)
+
+1. En el equipo, **mantén presionado el botón de parada de emergencia (IN3) durante 5 segundos**. La pantalla mostrará "Portal de administracion" con el SSID y la clave de la red WiFi que acaba de levantar el equipo.
+2. Desde tu teléfono o laptop, conéctate a esa red WiFi (SSID `AYSAFI-Portal-XXXX`, clave mostrada en pantalla).
+3. El sistema operativo debería abrir automáticamente la página de administración (portal cautivo). Si no abre sola, entra a `http://192.168.4.1/` desde el navegador.
+4. En la página verás la lista de tags registrados:
+   - **Agregar**: completa "ID del tag" (pásalo por el lector para verlo en el log serie, o pídelo al proveedor de la tarjeta) y "Apartamento / nombre", y pulsa Agregar.
+   - **Eliminar**: pulsa el botón "Eliminar" junto al tag correspondiente.
+5. Pulsa "Ver log de accesos" para ver el historial de lecturas (autorizadas y denegadas) con fecha/hora.
+6. Cuando termines, **vuelve a mantener presionado IN3 por 5 segundos** para cerrar el portal y que el equipo retome su operación normal (LoRa/MQTT/OTA).
+
+Los cambios se aplican de inmediato, sin reiniciar el equipo.
+
+> Mientras el portal está activo, el equipo sigue funcionando con LoRa y MQTT con normalidad (no interrumpe el servicio).
+
+### 3.2 Edición manual de `tags.txt` (alternativa sin conectividad)
+
+> Solo necesaria si no puedes usar el portal cautivo (por ejemplo, sin teléfono a mano). El formato del archivo se administra automáticamente al usar el portal; edítalo a mano solo si es indispensable.
+
+#### Formato del archivo `tags.txt`
 
 Ubicación: raíz de la tarjeta SD, archivo `/tags.txt`. Una credencial por línea, tres campos separados por coma:
 
@@ -48,7 +67,7 @@ Ejemplo:
 - **`FECHA`**: texto libre (no se valida ni se usa para expirar el acceso automáticamente); útil para llevar registro de cuándo se dio de alta.
 - Máximo **150 tags** por equipo (`maxTags`). Si necesitas más, hay que ampliar el firmware (contactar a soporte técnico).
 
-### 3.2 Cómo agregar o quitar un tag
+### 3.3 Cómo agregar o quitar un tag manualmente (SD)
 
 1. **Apaga el equipo** o espera a que no esté en uso (evita retirar la SD con el equipo energizado).
 2. Retira la tarjeta SD e insértala en una computadora.
@@ -60,10 +79,10 @@ Ejemplo:
 
 > El cambio solo se aplica al reiniciar (los tags se cargan una vez en el arranque, dentro de `setup()`).
 
-### 3.3 Verificar que un tag fue aceptado
+### 3.4 Verificar que un tag fue aceptado
 
-- Al pasar el tag por el lector, si está en la lista blanca el equipo activa el relé correspondiente y el evento se publica por MQTT en `aysafi/mqtt/loraSender/Monjitas1/Tags` (`id,apartamento,fecha_hora`).
-- Si el tag no está en la lista, no ocurre ninguna acción (no hay aviso audible; revisa el log serie o MQTT para confirmar lecturas rechazadas).
+- Al pasar el tag por el lector, si está en la lista blanca el equipo activa el relé correspondiente, publica el evento por MQTT en `aysafi/mqtt/loraSender/Monjitas1/Tags` y lo registra como `GRANTED` en el log de accesos (visible desde el portal cautivo, `/log`).
+- Si el tag no está en la lista, se registra como `DENIED` en el mismo log (con el ID leído), aunque no haya ninguna acción física ni aviso audible.
 
 ## 4. Accionamiento manual (botones físicos)
 
@@ -71,7 +90,8 @@ Ejemplo:
 |---|---|---|
 | Activar portón vehicular | `IN1` | Activa el relé `PORTON` |
 | Activar puerta peatonal | `IN2` | Activa el relé `PUERTA` |
-| Parada de emergencia | `IN3` | Corta el accionamiento en curso |
+| Parada de emergencia (pulsación corta) | `IN3` | Corta el accionamiento en curso |
+| Abrir/cerrar portal cautivo (mantener 5s) | `IN3` | Ver sección 3.1 |
 
 Los botones se leen por interrupción con antirrebote de software (~2 s de espera entre lecturas).
 

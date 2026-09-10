@@ -3,6 +3,7 @@
  * AYSAFI
  */
 #include "board_def.h"
+#include "access_portal.h"
 
 void setup()
 {
@@ -347,6 +348,7 @@ void loop()
     trama = Serial.readStringUntil('\n');
     // Serial.print("trama: ");
     // Serial.println(trama);
+    bool tagAutorizado = false;
     for (int x = 0; x < countTags; x++)
     {
       if (trama.indexOf(listaBlanca[x].id) != -1 && flagTagActivado == false)
@@ -362,11 +364,19 @@ void loop()
 #endif
         }
         // Serial.println("Tag autorizado");
+        registrarAcceso(tagPass, estacionamiento, true);
         digitalWrite(PORTON, HIGH);
         flagTagActivado = true;
         tiempoUltimoCambioTags = millis();
+        tagAutorizado = true;
         break;
       }
+    }
+    if (!tagAutorizado && flagTagActivado == false)
+    {
+      String tramaLimpia = trama;
+      tramaLimpia.trim();
+      registrarAcceso(tramaLimpia, "", false);
     }
   }
 
@@ -464,6 +474,8 @@ void loop()
   mqtt.publish("aysafi/esp32Lora/Monjitas/Recvr", "act-" + String(millis() / 1000) + "s");
 #endif
   mqtt.update(); // should be called
+  chequearBotonPortal();
+  manejarPortalCautivo();
 
   if ( millis() - tiempoConsultaActualizaciones > 1800000)
   {

@@ -29,7 +29,7 @@ flowchart LR
     SD[(SD card\ntags.txt)] --> ESP
 ```
 
-- **Lista blanca de tags**: se carga desde `/tags.txt` en la SD al arrancar (`loadTagsFromFile`). No hay alta/edición de tags desde el propio firmware; se administra editando ese archivo (ver manual de usuario).
+- **Lista blanca de tags**: se carga desde `/tags.txt` en la SD al arrancar (`loadTagsFromFile`). Se administra en caliente desde el [portal cautivo](#portal-cautivo-de-administraci%C3%B3n-de-tags) (alta/baja en tiempo real) o editando el archivo directamente (ver manual de usuario).
 - **Botones físicos** (`IN1`/`IN2`/`IN3` en la variante `LORA_V2_0_OLED`): accionamiento directo de portón, puerta peatonal y parada de emergencia.
 - **LoRa**: retransmite comandos hacia/desde un receptor remoto con verificación CRC32.
 - **MQTT**: publica logs, estado y tags leídos; permite accionar remotamente (`.../accionamientos`) y reiniciar (`.../reset`).
@@ -41,6 +41,7 @@ flowchart LR
 src/
   main.cpp        # setup()/loop(), lectura de tags, LoRa, MQTT
   board_def.h      # Selección de placa, pines, credenciales (via build_flags), OTA
+  access_portal.h  # Portal cautivo: alta/baja de tags en tiempo real + log de accesos
   images.h         # Bitmaps para el OLED
 lib/               # Forks vendorizados de LoRa y SSD1306 (no tocar salvo bugfix puntual)
 test/              # (placeholder, sin pruebas automatizadas todavía)
@@ -76,6 +77,27 @@ Selecciona la variante de placa activando **un solo** flag:
 `LORA_SENDER` (0 = receptor, 1 = emisor) es sobreescribible por `build_flags` (`-D LORA_SENDER=0`), aunque hoy el `platformio.ini` solo define el entorno *sender*.
 
 `LORA_PERIOD` fija la banda regional de LoRa (`433`/`868`/`915` MHz) — debe coincidir con la del receptor.
+
+## Portal cautivo de administración de tags
+
+`src/access_portal.h` implementa un portal cautivo (SoftAP + DNS + servidor
+web) para administrar la lista blanca **en tiempo real**, sin desmontar la SD:
+
+- **Activación**: mantener presionado `IN3` (parada de emergencia) 5 s alterna
+  el portal on/off. El equipo entra en modo `WIFI_MODE_APSTA`, así conserva su
+  conexión normal (MQTT/OTA) mientras el portal está activo.
+- **SSID/clave**: derivados del ID único del equipo (`AYSAFI-Portal-XXXX` /
+  `aysafiXXXXXX`) y mostrados en el OLED al activar — no hay credenciales fijas
+  en el repo.
+- **Detección automática**: responde los endpoints de sondeo de portal cautivo
+  de Android/iOS/Windows (`/generate_204`, `/hotspot-detect.html`, `/ncsi.txt`,
+  etc.) para que el teléfono/laptop abra la página de login solo, igual que un
+  hotspot público.
+- **Rutas**: `/` (listado + alta), `/add` (POST), `/delete` (POST), `/log`
+  (histórico de accesos).
+- **Log de accesos**: cada lectura de tag (autorizada o no) se registra en
+  `/access_log.csv` (`fecha,id,apartamento,GRANTED|DENIED`), visible desde
+  `/log`. Se recorta automáticamente pasadas ~500 líneas.
 
 ## Sistema de publicación de firmware (OTA vía GitHub)
 
@@ -133,20 +155,18 @@ Broker: `emqx.aysafi.com:1883` (sin TLS ni autenticación actualmente — ver Ro
 
 ## Limitaciones conocidas
 
-- Sin gestión remota de la lista blanca: agregar/quitar un tag exige sacar la SD y editar `tags.txt` a mano.
 - MQTT sin usuario/contraseña ni TLS: cualquiera con acceso a la red/broker puede leer logs o **accionar el portón**.
+- El portal cautivo usa una clave WPA2 derivada del ID del equipo (no configurable) y no tiene control de sesión/roles: quien se conecte a esa red puede administrar tags mientras el portal está activo.
 - OTA: el binario se descarga por HTTP plano sobre `HTTPClient` sin fijar una CA explícita (se apoya en la validación por defecto del core de Arduino-ESP32); no hay firma criptográfica del firmware, solo verificación de integridad (SHA-256), no de autenticidad.
 - `test/` no contiene pruebas automatizadas todavía.
-- No hay registro/auditoría persistente de accionamientos más allá del log de texto en la SD.
+- El log de accesos vive solo en la SD local (`/access_log.csv`), sin respaldo/consolidación central.
 
 ## Roadmap: hacia un sistema de control de acceso propio de AYSAFI
 
 Ideas ordenadas de mayor a menor prioridad para evolucionar esto de "firmware puntual para Monjitas" a un **producto de control de acceso reutilizable** para cualquier condominio:
 
 1. **Multi-tenant por configuración, no por compilación.** Hoy `idSlave`, tópicos MQTT y URLs dependen de constantes fijadas en tiempo de compilación (`"Monjitas1"`). Mover a un archivo de configuración en SD/NVS (`condominio.json`: nombre de sitio, tópicos MQTT, IDs de nodos) para que **un mismo binario** sirva a todos los condominios.
-2. **Portal de administración embebido** (como ya existe en el proyecto hermano `nodeIO_master`): un AP + página web local para:
-   - Alta/baja/edición de tags sin desmontar la SD.
-   - Configuración de WiFi/MQTT/LoRa desde el propio equipo (hoy es todo hardcodeado).
+2. **Reforzar el portal cautivo ya existente**: hoy alcanza con conocer la clave (visible en el OLED) para administrar tags; sumar login con usuario/rol, expiración de sesión y HTTPS (certificado autofirmado) antes de exponerlo en sitios sin supervisión.
 3. **Backend centralizado (multi-condominio)**: servicio (Aysafi Cloud) que:
    - Sincroniza la lista blanca hacia todos los nodos de un condominio (altas/bajas se propagan solas, no hay que tocar SD en cada equipo).
    - Centraliza logs de accionamiento y eventos (auditoría real, hoy solo texto plano local).
