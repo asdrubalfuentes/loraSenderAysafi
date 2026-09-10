@@ -164,6 +164,7 @@ int analogBuffer[NUM_CHANNELS][WINDOW_SIZE];
 int analogIndex[NUM_CHANNELS];
 
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <Update.h>
 #include <FS.h>
 #include <WebServer.h>
@@ -374,8 +375,14 @@ void isrBotones()
 // Función para verificar la versión más reciente
 String getLatestVersion()
 {
+    // releases/latest/download/* responde 302 al host de assets de GitHub:
+    // sin seguir redirecciones el GET vuelve vacio y la OTA no baja nada.
+    WiFiClientSecure sec;
+    sec.setInsecure();
     HTTPClient http;
-    http.begin(versionURL);
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    http.setTimeout(15000);
+    http.begin(sec, versionURL);
     int httpCode = http.GET();
     String payload = "";
 
@@ -396,8 +403,12 @@ String getLatestVersion()
 // Descarga firmware.sha256 (texto hex de 64 chars) publicado junto al binario.
 String getLatestFirmwareSha256()
 {
+    WiFiClientSecure sec;
+    sec.setInsecure();
     HTTPClient http;
-    http.begin(firmwareSha256URL);
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    http.setTimeout(15000);
+    http.begin(sec, firmwareSha256URL);
     int httpCode = http.GET();
     String payload = "";
 
@@ -561,8 +572,12 @@ void updateFirmware()
         return;
     }
 
+    WiFiClientSecure sec;
+    sec.setInsecure();
     HTTPClient http;
-    http.begin(firmwareURL);
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    http.setTimeout(15000);
+    http.begin(sec, firmwareURL);
     int httpCode = http.GET();
 
     if (httpCode == 200)
