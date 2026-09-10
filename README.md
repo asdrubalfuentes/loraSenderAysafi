@@ -20,13 +20,13 @@ Firmware ESP32 (TTGO/Heltec LoRa32, variante **Sender**) para control de acceso 
 
 ```mermaid
 flowchart LR
-    RFID[Lector RFID/NFC\n(UART)] -->|tag id| ESP[ESP32 Sender]
-    ESP -->|activa| PORTON[Relé Portón]
-    ESP -->|activa| PUERTA[Relé Puerta peatonal]
-    ESP <-->|LoRa 915MHz| RECV[ESP32 Receiver remoto]
-    ESP <-->|MQTT| BROKER[emqx.aysafi.com]
-    ESP -->|WiFi HTTPS| GH[GitHub Releases\n(OTA)]
-    SD[(SD card\ntags.txt)] --> ESP
+    RFID["Lector RFID/NFC (UART)"] -->|tag id| ESP["ESP32 Sender"]
+    ESP -->|activa| PORTON["Relé Portón"]
+    ESP -->|activa| PUERTA["Relé Puerta peatonal"]
+    ESP <-->|LoRa 915MHz| RECV["ESP32 Receiver remoto"]
+    ESP <-->|MQTT| BROKER["emqx.aysafi.com"]
+    ESP -->|WiFi HTTPS| GH["GitHub Releases (OTA)"]
+    SD["SD card (tags.txt)"] --> ESP
 ```
 
 - **Lista blanca de tags**: se carga desde `/tags.txt` en la SD al arrancar (`loadTagsFromFile`). Se administra en caliente desde el [portal cautivo](#portal-cautivo-de-administraci%C3%B3n-de-tags) (alta/baja en tiempo real) o editando el archivo directamente (ver manual de usuario).
