@@ -132,12 +132,19 @@ Durante la actualización, la pantalla muestra una barra de progreso ("Actualiza
 
 ## 7. Configuración de red y placa (requiere reflashear)
 
-Estos parámetros están fijados en el firmware y **no se pueden cambiar desde el equipo**; requieren recompilar y volver a flashear (contactar a soporte técnico/desarrollo):
+La **red WiFi del router** y la **contraseña de administrador** ya se cambian
+desde el equipo (portal → "Configuración avanzada", sección 3.2).
 
-- Red WiFi (SSID/contraseña) — inyectada en tiempo de compilación.
+Estos otros parámetros siguen fijados en el firmware y **no se pueden cambiar
+desde el equipo**; requieren recompilar y volver a flashear (soporte
+técnico/desarrollo):
+
 - Broker y puerto MQTT.
 - Banda de frecuencia LoRa (433/868/915 MHz) — debe coincidir con el equipo receptor emparejado.
 - Variante de placa (V1.0/V1.2/V1.6/V2.0).
+
+El SSID/clave WiFi de fábrica se inyecta en compilación desde variables de
+entorno/secrets (nunca va en el repositorio); el portal lo sobreescribe.
 
 ## 8. Solución de problemas comunes
 
