@@ -1,0 +1,77 @@
+name: Build & Release firmware
+
+# Disparador = aprobacion del mantenedor: un tag vX.Y.Z creado sobre `main`.
+# El job compila con PlatformIO, calcula el checksum y publica un GitHub
+# Release marcado como "latest" con firmware.bin + version.txt + firmware.sha256.
+# Esos 3 assets son los que el dispositivo consulta en cada arranque
+# (releases/latest/download/...), asi que en el siguiente reinicio ya
+# queda con el firmware aprobado.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Falla explicitamente si el tag no cuelga de main (evita publicar
+          # firmware "aprobado" desde una rama no revisada).
+          fetch-depth: 0
+
+      - name: Verificar que el tag pertenece a main
+        run: |
+          git fetch origin main --depth=100
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::El tag ${GITHUB_REF_NAME} no es un ancestro de main. Solo se publican tags creados sobre main."
+            exit 1
+          fi
+
+      - name: Extraer version del tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Compilar firmware
+        env:
+          WIFI_SSID: ${{ secrets.WIFI_SSID }}
+          WIFI_PASSWORD: ${{ secrets.WIFI_PASSWORD }}
+          EXTRA_BUILD_FLAGS: -D FW_VERSION_OVERRIDE=\"${{ steps.version.outputs.version }}\"
+        run: pio run -e ttgo-lora32-v2
+
+      - name: Preparar assets del release
+        id: assets
+        run: |
+          mkdir -p dist
+          cp .pio/build/ttgo-lora32-v2/firmware.bin dist/firmware.bin
+          echo -n "${{ steps.version.outputs.version }}" > dist/version.txt
+          sha256sum dist/firmware.bin | cut -d ' ' -f1 | tr -d '\n' > dist/firmware.sha256
+          echo "Version: ${{ steps.version.outputs.version }}"
+          echo "SHA256:  $(cat dist/firmware.sha256)"
+
+      - name: Publicar GitHub Release (latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Firmware ${{ steps.version.outputs.version }}"
+          tag_name: ${{ github.ref_name }}
+          make_latest: true
+          files: |
+            dist/firmware.bin
+            dist/version.txt
+            dist/firmware.sha256
