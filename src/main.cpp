@@ -3,6 +3,7 @@
  * AYSAFI
  */
 #include "board_def.h"
+#include "runtime_config.h"
 #include "access_portal.h"
 
 void setup()
@@ -105,7 +106,7 @@ void setup()
   }
 #endif // DS3231_ONBOARD
 
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFi.begin(cfgWifiSsid().c_str(), cfgWifiPassword().c_str());
   delay(2000);
   if (WiFi.waitForConnectResult() != WL_CONNECTED)
   {

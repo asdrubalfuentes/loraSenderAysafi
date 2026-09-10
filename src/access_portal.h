@@ -6,19 +6,23 @@
 // red del condominio (modo APSTA), y expone una pagina web en 192.168.4.1
 // para:
 //   - Agregar/eliminar tags RFID en tiempo real (persistidos en /tags.txt).
-//   - Consultar el log de accesos (granted/denied) por tag.
+//   - Consultar y descargar (CSV) el log de accesos (granted/denied) por tag.
+//   - Configurar la red WiFi del router y la contraseña de administrador
+//     (persistidas en NVS, requieren reiniciar el equipo para aplicarse).
 //
 // Un DNSServer responde cualquier dominio con la IP del portal para que los
 // telefonos/laptops detecten automaticamente el "portal cautivo" al conectarse
 // al BSSID que levanta el equipo, igual que un router de hotel/cafeteria.
 //
-// Requiere que board_def.h ya haya sido incluido (usa listaBlanca, countTags,
-// maxTags, idUnico, display, saveTagsToFile, getFormattedDateTime).
+// Requiere que board_def.h y runtime_config.h ya hayan sido incluidos (usa
+// listaBlanca, countTags, maxTags, idUnico, display, saveTagsToFile,
+// getFormattedDateTime, cfgWifiSsid/cfgWifiPassword/cfgAdminPassword).
 
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <SD.h>
+#include "runtime_config.h"
 
 static DNSServer portalDns;
 static WebServer portalWeb(80);
@@ -127,6 +131,20 @@ static String htmlEscapar(const String &s)
     return out;
 }
 
+// Protege las rutas de configuración (WiFi del router, contraseña de
+// administrador, reinicio) con HTTP Basic Auth, separado de la clave del AP
+// del portal: quien conozca la red WiFi del portal puede administrar tags,
+// pero no cambiar la red ni reiniciar el equipo sin esta segunda clave.
+static bool portalRequiereAuth()
+{
+    if (!portalWeb.authenticate("admin", cfgAdminPassword().c_str()))
+    {
+        portalWeb.requestAuthentication();
+        return false;
+    }
+    return true;
+}
+
 static String portalEstilo()
 {
     return F("<style>"
@@ -167,7 +185,8 @@ static void portalHandleRoot()
              "<input type=hidden name=id value='" + htmlEscapar(listaBlanca[i].id) + "'>"
              "<button class=del>Eliminar</button></form></td></tr>";
     }
-    h += F("</table><p><a href=/log>Ver log de accesos &rarr;</a></p></main></body></html>");
+    h += F("</table><p><a href=/log>Ver log de accesos &rarr;</a></p>"
+           "<p><a href=/config>Configuraci&oacute;n avanzada &rarr;</a></p></main></body></html>");
 
     portalWeb.send(200, "text/html", h);
 }
@@ -200,6 +219,7 @@ static void portalHandleLog()
            "<title>AYSAFI - Log de accesos</title>");
     h += portalEstilo();
     h += F("</head><body><main><h1>Log de accesos</h1>"
+           "<p><a href=/log.csv>Descargar CSV</a></p>"
            "<table><tr><th>Fecha/hora</th><th>ID</th><th>Apartamento</th><th>Resultado</th></tr>");
 
     if (SD.exists(ACCESS_LOG_PATH))
@@ -235,6 +255,93 @@ static void portalHandleLog()
     portalWeb.send(200, "text/html", h);
 }
 
+// Descarga del log de accesos como CSV (mismo contenido que /log en formato tabla).
+static void portalHandleLogCsv()
+{
+    if (!SD.exists(ACCESS_LOG_PATH))
+    {
+        portalWeb.send(404, "text/plain", "Sin log de accesos todavia");
+        return;
+    }
+    File f = SD.open(ACCESS_LOG_PATH, FILE_READ);
+    portalWeb.sendHeader("Content-Disposition", "attachment; filename=access_log.csv");
+    portalWeb.streamFile(f, "text/csv");
+    f.close();
+}
+
+// Página de configuración avanzada: red WiFi (router del condominio) y
+// contraseña de administrador. Requiere reiniciar el equipo para aplicarse.
+static void portalHandleConfigGet()
+{
+    if (!portalRequiereAuth())
+    {
+        return;
+    }
+    String h;
+    h.reserve(3072);
+    h += F("<!doctype html><html><head><meta charset=utf-8>"
+           "<meta name=viewport content='width=device-width,initial-scale=1'>"
+           "<title>AYSAFI - Configuraci&oacute;n</title>");
+    h += portalEstilo();
+    h += F("</head><body><main><h1>Configuraci&oacute;n avanzada</h1>"
+           "<form method=post action=/config/save>"
+           "<h2>Red WiFi (router del condominio)</h2>");
+    h += "<label>SSID</label><input name=ssid maxlength=32 value='" + htmlEscapar(cfgWifiSsid()) + "'>";
+    h += F("<label>Contrase&ntilde;a (dejar en blanco para no cambiarla)</label>"
+           "<input name=wifipass type=password maxlength=64>"
+           "<h2>Contrase&ntilde;a de administrador</h2>"
+           "<label>Nueva contrase&ntilde;a (dejar en blanco para no cambiarla)</label>"
+           "<input name=adminpass type=password maxlength=64>"
+           "<button style='width:100%;margin-top:8px'>Guardar</button></form>"
+           "<p style='color:#f88'>Los cambios de red o de contrase&ntilde;a de administrador "
+           "requieren reiniciar el equipo para aplicarse.</p>"
+           "<form method=post action=/reboot onsubmit=\"return confirm('Reiniciar el equipo ahora?')\">"
+           "<button class=del style='width:100%'>Reiniciar equipo</button></form>"
+           "<p><a href=/>&larr; Volver</a></p></main></body></html>");
+
+    portalWeb.send(200, "text/html", h);
+}
+
+static void portalHandleConfigSave()
+{
+    if (!portalRequiereAuth())
+    {
+        return;
+    }
+    String ssid = portalWeb.arg("ssid");
+    ssid.trim();
+    String wifipass = portalWeb.arg("wifipass");
+    String adminpass = portalWeb.arg("adminpass");
+
+    if (ssid.length() > 0)
+    {
+        cfgSetWifi(ssid, wifipass.length() > 0 ? wifipass : cfgWifiPassword());
+    }
+    if (adminpass.length() > 0)
+    {
+        cfgSetAdminPassword(adminpass);
+    }
+
+    String h;
+    h += portalEstilo();
+    h += F("<main><h1>Configuraci&oacute;n guardada</h1>"
+           "<p>Los cambios se aplicar&aacute;n al reiniciar el equipo.</p>"
+           "<form method=post action=/reboot><button style='width:100%'>Reiniciar ahora</button></form>"
+           "<p><a href=/config>&larr; Volver</a></p></main>");
+    portalWeb.send(200, "text/html", h);
+}
+
+static void portalHandleReboot()
+{
+    if (!portalRequiereAuth())
+    {
+        return;
+    }
+    portalWeb.send(200, "text/plain", "Reiniciando...");
+    delay(500);
+    ESP.restart();
+}
+
 // Cualquier URL desconocida (o de deteccion de portal cautivo de iOS/Android/
 // Windows) redirige a la pagina principal, para que el sistema operativo
 // muestre automaticamente el aviso de "iniciar sesion en esta red".
@@ -265,6 +372,10 @@ void iniciarPortalCautivo()
     portalWeb.on("/add", HTTP_POST, portalHandleAdd);
     portalWeb.on("/delete", HTTP_POST, portalHandleDelete);
     portalWeb.on("/log", HTTP_GET, portalHandleLog);
+    portalWeb.on("/log.csv", HTTP_GET, portalHandleLogCsv);
+    portalWeb.on("/config", HTTP_GET, portalHandleConfigGet);
+    portalWeb.on("/config/save", HTTP_POST, portalHandleConfigSave);
+    portalWeb.on("/reboot", HTTP_POST, portalHandleReboot);
     portalWeb.on("/generate_204", portalHandleCaptive);  // Android
     portalWeb.on("/gen_204", portalHandleCaptive);        // Android
     portalWeb.on("/hotspot-detect.html", portalHandleCaptive); // iOS/macOS

@@ -35,14 +35,28 @@ Hay dos formas de administrar la lista blanca: el **portal cautivo** (en tiempo 
 4. En la página verás la lista de tags registrados:
    - **Agregar**: completa "ID del tag" (pásalo por el lector para verlo en el log serie, o pídelo al proveedor de la tarjeta) y "Apartamento / nombre", y pulsa Agregar.
    - **Eliminar**: pulsa el botón "Eliminar" junto al tag correspondiente.
-5. Pulsa "Ver log de accesos" para ver el historial de lecturas (autorizadas y denegadas) con fecha/hora.
+5. Pulsa "Ver log de accesos" para ver el historial de lecturas (autorizadas y denegadas) con fecha/hora. Desde ahí también puedes pulsar "Descargar CSV" para guardar el log completo en tu teléfono/laptop.
 6. Cuando termines, **vuelve a mantener presionado IN3 por 5 segundos** para cerrar el portal y que el equipo retome su operación normal (LoRa/MQTT/OTA).
 
 Los cambios se aplican de inmediato, sin reiniciar el equipo.
 
 > Mientras el portal está activo, el equipo sigue funcionando con LoRa y MQTT con normalidad (no interrumpe el servicio).
 
-### 3.2 Edición manual de `tags.txt` (alternativa sin conectividad)
+### 3.2 Configuración avanzada (red WiFi y contraseña de administrador)
+
+Desde la página principal del portal, pulsa "Configuración avanzada". Te pedirá un usuario y contraseña **distintos** a los de la red WiFi del portal:
+
+- Usuario: `admin`
+- Contraseña: la que hayas definido, o por defecto `admin` + los últimos 6 caracteres del ID único del equipo (el mismo ID que se ve en pantalla al encender).
+
+En esa página puedes cambiar:
+
+- **Red WiFi del router** (SSID y contraseña) a la que el equipo se conecta para MQTT y actualizaciones OTA.
+- **Contraseña de administrador** del propio portal (deja el campo en blanco para no cambiarla).
+
+> **Importante**: estos cambios no se aplican en caliente. Después de guardar, pulsa "Reiniciar equipo" (en la misma página o en la de confirmación) para que el equipo arranque de nuevo con la configuración nueva. Si cambias el SSID/contraseña del router y son incorrectos, el equipo seguirá funcionando localmente (LoRa/botones) pero sin WiFi hasta que corrijas los datos desde el portal.
+
+### 3.3 Edición manual de `tags.txt` (alternativa sin conectividad)
 
 > Solo necesaria si no puedes usar el portal cautivo (por ejemplo, sin teléfono a mano). El formato del archivo se administra automáticamente al usar el portal; edítalo a mano solo si es indispensable.
 
@@ -67,7 +81,7 @@ Ejemplo:
 - **`FECHA`**: texto libre (no se valida ni se usa para expirar el acceso automáticamente); útil para llevar registro de cuándo se dio de alta.
 - Máximo **150 tags** por equipo (`maxTags`). Si necesitas más, hay que ampliar el firmware (contactar a soporte técnico).
 
-### 3.3 Cómo agregar o quitar un tag manualmente (SD)
+### 3.4 Cómo agregar o quitar un tag manualmente (SD)
 
 1. **Apaga el equipo** o espera a que no esté en uso (evita retirar la SD con el equipo energizado).
 2. Retira la tarjeta SD e insértala en una computadora.
@@ -79,7 +93,7 @@ Ejemplo:
 
 > El cambio solo se aplica al reiniciar (los tags se cargan una vez en el arranque, dentro de `setup()`).
 
-### 3.4 Verificar que un tag fue aceptado
+### 3.5 Verificar que un tag fue aceptado
 
 - Al pasar el tag por el lector, si está en la lista blanca el equipo activa el relé correspondiente, publica el evento por MQTT en `aysafi/mqtt/loraSender/Monjitas1/Tags` y lo registra como `GRANTED` en el log de accesos (visible desde el portal cautivo, `/log`).
 - Si el tag no está en la lista, se registra como `DENIED` en el mismo log (con el ID leído), aunque no haya ninguna acción física ni aviso audible.

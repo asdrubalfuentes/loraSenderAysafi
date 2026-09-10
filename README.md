@@ -94,10 +94,18 @@ web) para administrar la lista blanca **en tiempo real**, sin desmontar la SD:
   etc.) para que el teléfono/laptop abra la página de login solo, igual que un
   hotspot público.
 - **Rutas**: `/` (listado + alta), `/add` (POST), `/delete` (POST), `/log`
-  (histórico de accesos).
+  (histórico de accesos), `/log.csv` (descarga del log), `/config` (red WiFi
+  del router + contraseña de administrador, protegido con HTTP Basic Auth
+  independiente de la clave del AP), `/config/save` (POST) y `/reboot` (POST).
 - **Log de accesos**: cada lectura de tag (autorizada o no) se registra en
   `/access_log.csv` (`fecha,id,apartamento,GRANTED|DENIED`), visible desde
-  `/log`. Se recorta automáticamente pasadas ~500 líneas.
+  `/log` y descargable en `/log.csv`. Se recorta automáticamente pasadas ~500
+  líneas.
+- **Configuración persistente (NVS)**: `src/runtime_config.h` guarda en NVS
+  (Preferences) el SSID/clave del router y la contraseña de administrador,
+  con los `build_flags` (`WIFI_SSID`/`WIFI_PASSWORD`) como valores de fábrica.
+  Cambiarlos desde `/config` **requiere reiniciar el equipo** (botón
+  "Reiniciar equipo" en la misma página) para que tomen efecto.
 
 ## Sistema de publicación de firmware (OTA vía GitHub)
 
@@ -156,7 +164,7 @@ Broker: `emqx.aysafi.com:1883` (sin TLS ni autenticación actualmente — ver Ro
 ## Limitaciones conocidas
 
 - MQTT sin usuario/contraseña ni TLS: cualquiera con acceso a la red/broker puede leer logs o **accionar el portón**.
-- El portal cautivo usa una clave WPA2 derivada del ID del equipo (no configurable) y no tiene control de sesión/roles: quien se conecte a esa red puede administrar tags mientras el portal está activo.
+- El portal cautivo usa una clave WPA2 derivada del ID del equipo (no configurable) para el AP; la sección `/config` (red WiFi y contraseña de administrador) exige una segunda clave (admin) separada, también derivada por defecto del ID del equipo hasta que se cambie.
 - OTA: el binario se descarga por HTTP plano sobre `HTTPClient` sin fijar una CA explícita (se apoya en la validación por defecto del core de Arduino-ESP32); no hay firma criptográfica del firmware, solo verificación de integridad (SHA-256), no de autenticidad.
 - `test/` no contiene pruebas automatizadas todavía.
 - El log de accesos vive solo en la SD local (`/access_log.csv`), sin respaldo/consolidación central.
