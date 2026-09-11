@@ -4,7 +4,7 @@ Versión del canal OTA: `MAJOR.MINOR.PATCH` (semver numérico). El CI la inyecta
 desde el tag `vX.Y.Z` (`FW_VERSION_OVERRIDE`); `currentVersion` de `board_def.h`
 es el respaldo local.
 
-## Sin publicar
+## 1.0.24
 
 ### fix(ota): seguir las redirecciones de GitHub Releases
 

@@ -190,7 +190,7 @@ const String idSlave = "80aa8b910250";
 #ifdef FW_VERSION_OVERRIDE
 String currentVersion = FW_VERSION_OVERRIDE;
 #else
-String currentVersion = "1.0.23";
+String currentVersion = "1.0.24";
 #endif
 bool respuesta = false;
 #elif LORA_SENDER == 0
@@ -200,7 +200,7 @@ const char *firmwareSha256URL = GH_RELEASE_BASE "firmware.sha256";
 #ifdef FW_VERSION_OVERRIDE
 String currentVersion = FW_VERSION_OVERRIDE;
 #else
-String currentVersion = "1.0.20";
+String currentVersion = "1.0.24";
 #endif
 bool vehicularRemoteFlag = false, peatonalRemoteFlag = false;
 String idMaster = "80aa8b910250";
